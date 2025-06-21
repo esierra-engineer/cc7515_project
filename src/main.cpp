@@ -98,7 +98,7 @@ int main()
         {
             char filename[64];
             sprintf(filename, "heat_%04d.png", n);
-            save_png(Un, nx, ny, filename, 'c');
+            //save_png(Un, nx, ny, filename, 'c');
         }
         // Swapping the pointers for the next timestep
         std::swap(Un, Unp1);
