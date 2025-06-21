@@ -9,8 +9,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-
-#include "pngwriter.h"
+#include "utils.cuh"
+#include "main_CUDA.cuh"
+// #include "pngwriter.h"
 
 /* Convert 2D index layout to unrolled 1D layout
  *
@@ -20,30 +21,7 @@
  *
  * \returns An index in the unrolled 1D array.
  */
-int getIndex(const int i, const int j, const int width)
-{
-    return i*width + j;
-}
-
-int main()
-{
-    const int nx = 200;   // Width of the area
-    const int ny = 200;   // Height of the area
-
-    const float a = 0.5;     // Diffusion constant
-
-    const float dx = 0.01;   // Horizontal grid spacing
-    const float dy = 0.01;   // Vertical grid spacing
-
-    const float dx2 = dx*dx;
-    const float dy2 = dy*dy;
-
-    const float dt = dx2 * dy2 / (2.0 * a * (dx2 + dy2)); // Largest stable time step
-    const int numSteps = 5000;                             // Number of time steps
-    const int outputEvery = 1000;                          // How frequently to write output image
-
-    int numElements = nx*ny;
-
+void mainCPU(int nx, int ny, float a, float dt, int numSteps, int outputEvery, int numElements, float dx2, float dy2) {
     // Allocate two sets of data for current and next timesteps
     float* Un   = (float*)calloc(numElements, sizeof(float));
     float* Unp1 = (float*)calloc(numElements, sizeof(float));
@@ -106,11 +84,33 @@ int main()
 
     // Timing
     clock_t finish = clock();
-    printf("It took %f seconds\n", (double)(finish - start) / CLOCKS_PER_SEC);
+    printf("[CPU] It took %f seconds\n", (double)(finish - start) / CLOCKS_PER_SEC);
 
     // Release the memory
     free(Un);
     free(Unp1);
+}
+int main()
+{
+    const int nx = 200;   // Width of the area
+    const int ny = 200;   // Height of the area
+
+    const float a = 0.5;     // Diffusion constant
+
+    const float dx = 0.01;   // Horizontal grid spacing
+    const float dy = 0.01;   // Vertical grid spacing
+
+    const float dx2 = dx*dx;
+    const float dy2 = dy*dy;
+
+    const float dt = dx2 * dy2 / (2.0 * a * (dx2 + dy2)); // Largest stable time step
+    const int numSteps = 5000;                             // Number of time steps
+    const int outputEvery = 1000;                          // How frequently to write output image
+
+    int numElements = nx*ny;
+
+    mainCPU(nx, ny, a, dt, numSteps, outputEvery, numElements, dx2, dy2);
+    mainCUDA(nx, ny, a, dt, numSteps, outputEvery, numElements, dx2, dy2);
 
     return 0;
 }
