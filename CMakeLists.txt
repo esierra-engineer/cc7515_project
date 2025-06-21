@@ -13,7 +13,8 @@ include_directories(src)
 include_directories(src/include)
 
 set(SOURCES
-        src/main_cuda.cu
+        src/main_CUDA.cu
+        src/main_CPU.cpp
         src/main.cpp
 )
 
