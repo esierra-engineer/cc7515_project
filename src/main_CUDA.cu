@@ -14,6 +14,8 @@
 #include <time.h>
 #include "utils.cuh"
 #include "main_CUDA.cuh"
+
+#include "Point.h"
 // #include "pngwriter.h"
 
 #define BLOCK_SIZE_X 16
@@ -32,61 +34,46 @@
 //     return i*width + j;
 // }
 
-__global__ void evolve_kernel(const float* Un, float* Unp1, const int nx, const int ny, const float dx2, const float dy2, const float aTimesDt)
+__global__ void evolve_kernel(simulationConf* conf, Point* points, const float aTimesDt)
 {
     int i = threadIdx.x + blockIdx.x*blockDim.x;
-    if (i > 0 && i < nx - 1)
+    if (i > 0 && i < conf->nx - 1)
     {
         int j = threadIdx.y + blockIdx.y*blockDim.y;
-        if (j > 0 && j < ny - 1)
+        if (j > 0 && j < conf->ny - 1)
         {
-            const int index = getIndex(i, j, ny);
-            float uij = Un[index];
-            float uim1j = Un[getIndex(i-1, j, ny)];
-            float uijm1 = Un[getIndex(i, j-1, ny)];
-            float uip1j = Un[getIndex(i+1, j, ny)];
-            float uijp1 = Un[getIndex(i, j+1, ny)];
+            const int index = getIndex(i, j, conf->ny);
+            float uij = conf->Un[index];
+            float uim1j = conf->Un[getIndex(i-1, j, conf->ny)];
+            float uijm1 = conf->Un[getIndex(i, j-1, conf->ny)];
+            float uip1j = conf->Un[getIndex(i+1, j, conf->ny)];
+            float uijp1 = conf->Un[getIndex(i, j+1, conf->ny)];
 
             // Explicit scheme
-            Unp1[index] = uij + aTimesDt * ( (uim1j - 2.0*uij + uip1j)/dx2 + (uijm1 - 2.0*uij + uijp1)/dy2 );
+            conf->Unp1[index] = uij + aTimesDt * ( (uim1j - 2.0*uij + uip1j)/conf->dx2 + (uijm1 - 2.0*uij + uijp1)/conf->dy2 );
+            points[index].T = conf->Unp1[index];
         }
     }
 }
 
-void mainCUDA(int nx, int ny, float a, float dt, int numSteps, int outputEvery, int numElements, float dx2, float dy2)
+void mainCUDA(simulationConf* conf, Point* points)
 {
-    // Allocate two sets of data for current and next timesteps
-    float* h_Un   = (float*)calloc(numElements, sizeof(float));
-    float* h_Unp1 = (float*)calloc(numElements, sizeof(float));
-
-    // Initializing the data with a pattern of disk of radius of 1/6 of the width
-    float radius2 = (nx/6.0) * (nx/6.0);
-    for (int i = 0; i < nx; i++)
-    {
-        for (int j = 0; j < ny; j++)
-        {
-            int index = getIndex(i, j, ny);
-            // Distance of point i, j from the origin
-            float ds2 = (i - nx/2) * (i - nx/2) + (j - ny/2)*(j - ny/2);
-            if (ds2 < radius2)
-            {
-                h_Un[index] = 65.0;
-            }
-            else
-            {
-                h_Un[index] = 5.0;
-            }
-        }
-    }
-
-    // Fill in the data on the next step to ensure that the boundaries are identical.
-    memcpy(h_Unp1, h_Un, numElements*sizeof(float));
+    float* Un = conf->Un;
+    float* Unp1 = conf->Unp1;
+    int nx = conf->nx, ny = conf->ny, numSteps = conf->numSteps,
+    outputEvery = conf->outputEvery, numElements = conf->numElements;
+    float a= conf->a, dt= conf->dt;
+    const char* output_filename = conf->output_filename_GPU;
 
     float* d_Un;
     float* d_Unp1;
+    Point* d_points;
+    simulationConf* d_conf;
 
     cudaMalloc((void**)&d_Un, numElements*sizeof(float));
     cudaMalloc((void**)&d_Unp1, numElements*sizeof(float));
+    cudaMalloc((void**)&d_points, numElements*sizeof(Point));
+    cudaMalloc((void**)&d_conf, 1*sizeof(simulationConf));
 
     dim3 numBlocks(nx/BLOCK_SIZE_X + 1, ny/BLOCK_SIZE_Y + 1);
     dim3 threadsPerBlock(BLOCK_SIZE_X, BLOCK_SIZE_Y);
@@ -94,16 +81,25 @@ void mainCUDA(int nx, int ny, float a, float dt, int numSteps, int outputEvery, 
     // Timing
     clock_t start = clock();
 
+
     // Main loop
     for (int n = 0; n <= numSteps; n++)
     {
-        cudaMemcpy(d_Un, h_Un, numElements*sizeof(float), cudaMemcpyHostToDevice);
-        cudaMemcpy(d_Unp1, h_Unp1, numElements*sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_Un, Un, numElements*sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_Unp1, Unp1, numElements*sizeof(float), cudaMemcpyHostToDevice);
+        cudaMemcpy(d_points, points, numElements*sizeof(Point), cudaMemcpyHostToDevice);
+        conf->Un = d_Un;
+        conf->Unp1 = d_Unp1;
+        cudaMemcpy(d_conf, conf, 1*sizeof(simulationConf), cudaMemcpyHostToDevice);
 
-        evolve_kernel<<<numBlocks, threadsPerBlock>>>(d_Un, d_Unp1, nx, ny, dx2, dy2, a*dt);
+        evolve_kernel<<<numBlocks, threadsPerBlock>>>(d_conf, d_points, a*dt);
 
-        cudaMemcpy(h_Un, d_Un, numElements*sizeof(float), cudaMemcpyDeviceToHost);
-        cudaMemcpy(h_Unp1, d_Unp1, numElements*sizeof(float), cudaMemcpyDeviceToHost);
+        cudaMemcpy(Un, d_Un, numElements*sizeof(float), cudaMemcpyDeviceToHost);
+        cudaMemcpy(Unp1, d_Unp1, numElements*sizeof(float), cudaMemcpyDeviceToHost);
+        cudaMemcpy(points, d_points, numElements*sizeof(Point), cudaMemcpyDeviceToHost);
+        cudaMemcpy(conf, d_conf, 1*sizeof(simulationConf), cudaMemcpyDeviceToHost);
+        conf->Un = Un;
+        conf->Unp1 = Unp1;
 
         // Write the output if needed
         if (n % outputEvery == 0)
@@ -114,22 +110,21 @@ void mainCUDA(int nx, int ny, float a, float dt, int numSteps, int outputEvery, 
                 printf("Cuda error %d: %s\n", errorCode, cudaGetErrorString(errorCode));
                 exit(0);
             }
-            char filename[64];
-            sprintf(filename, "heat_%04d.png", n);
+            //char filename[64];
+            //sprintf(filename, "heat_%04d.png", n);
             //save_png(h_Un, nx, ny, filename, 'c');
+            printArray(points, numElements, output_filename, n);
         }
         // Swapping the pointers for the next timestep
-        std::swap(h_Un, h_Unp1);
+        std::swap(Un, Unp1);
     }
 
     // Timing
     clock_t finish = clock();
-    printf("[CUDA] It took %f seconds\n", (double)(finish - start) / CLOCKS_PER_SEC);
-
-    // Release the memory
-    free(h_Un);
-    free(h_Unp1);
+    printf("[CUDA] It took %f seconds\n", (double)(finish - start) / CLOCKS_PER_SEC);;
 
     cudaFree(d_Un);
     cudaFree(d_Unp1);
+    cudaFree(d_points);
+    cudaFree(d_conf);
 }

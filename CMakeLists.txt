@@ -16,6 +16,7 @@ set(SOURCES
         src/main_CUDA.cu
         src/main_CPU.cpp
         src/main.cpp
+        src/Point.cpp
 )
 
 add_executable(cc7515_project

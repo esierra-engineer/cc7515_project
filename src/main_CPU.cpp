@@ -2,37 +2,25 @@
 // Created by erick on 6/21/25.
 //
 #include <algorithm>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
+#include <cstdio>
+#include <cstring>
+#include <ctime>
 #include "utils.cuh"
 #include "main_CPU.h"
 
-void mainCPU(int nx, int ny, float a, float dt, int numSteps, int outputEvery, int numElements, float dx2, float dy2) {
-    // Allocate two sets of data for current and next timesteps
-    float* Un   = (float*)calloc(numElements, sizeof(float));
-    float* Unp1 = (float*)calloc(numElements, sizeof(float));
+#include <iostream>
 
-    // Initializing the data with a pattern of disk of radius of 1/6 of the width
-    float radius2 = (nx/6.0) * (nx/6.0);
-    for (int i = 0; i < nx; i++)
-    {
-        for (int j = 0; j < ny; j++)
-        {
-            int index = getIndex(i, j, ny);
-            // Distance of point i, j from the origin
-            float ds2 = (i - nx/2) * (i - nx/2) + (j - ny/2)*(j - ny/2);
-            if (ds2 < radius2)
-            {
-                Un[index] = 65.0;
-            }
-            else
-            {
-                Un[index] = 5.0;
-            }
-        }
-    }
+#include "Point.h"
+#include "simulationConf.h"
+
+void mainCPU(simulationConf* conf, Point* points) {
+
+    float* Un = conf->Un;
+    float* Unp1 = conf->Unp1;
+    int nx = conf->nx, ny = conf->ny, numSteps = conf->numSteps,
+    outputEvery = conf->outputEvery, numElements = conf->numElements;
+    float a= conf->a, dt= conf->dt, dx2 = conf->dx2, dy2 = conf->dy2;
+    const char* output_filename = conf->output_filename_CPU;
 
     // Fill in the data on the next step to ensure that the boundaries are identical.
     memcpy(Unp1, Un, numElements*sizeof(float));
@@ -57,13 +45,15 @@ void mainCPU(int nx, int ny, float a, float dt, int numSteps, int outputEvery, i
 
                 // Explicit scheme
                 Unp1[index] = uij + a * dt * ( (uim1j - 2.0*uij + uip1j)/dx2 + (uijm1 - 2.0*uij + uijp1)/dy2 );
+                points[index].T = Unp1[index];
             }
         }
         // Write the output if needed
         if (n % outputEvery == 0)
         {
-            char filename[64];
-            sprintf(filename, "heat_%04d.png", n);
+            //char filename[64];
+            //sprintf(filename, "heat_%04d.png", n);
+            printArray(points, numElements, output_filename, n);
             //save_png(Un, nx, ny, filename, 'c');
         }
         // Swapping the pointers for the next timestep
@@ -73,8 +63,4 @@ void mainCPU(int nx, int ny, float a, float dt, int numSteps, int outputEvery, i
     // Timing
     clock_t finish = clock();
     printf("[CPU] It took %f seconds\n", (double)(finish - start) / CLOCKS_PER_SEC);
-
-    // Release the memory
-    free(Un);
-    free(Unp1);
 }

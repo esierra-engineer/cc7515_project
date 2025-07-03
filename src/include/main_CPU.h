@@ -4,7 +4,9 @@
 
 #ifndef MAIN_CPU_H
 #define MAIN_CPU_H
+#include "Point.h"
+#include "simulationConf.h"
 
-void mainCPU(int nx, int ny, float a, float dt, int numSteps, int outputEvery, int numElements, float dx2, float dy2);
+void mainCPU(simulationConf* conf, Point* points);
 
 #endif //MAIN_CPU_H

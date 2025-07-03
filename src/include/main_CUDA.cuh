@@ -4,7 +4,10 @@
 
 #ifndef MAIN_CUDA_CUH
 #define MAIN_CUDA_CUH
+#include "Point.h"
+#include "simulationConf.h"
 
-void mainCUDA(int nx, int ny, float a, float dt, int numSteps, int outputEvery, int numElements, float dx2, float dy2);
+
+void mainCUDA(simulationConf* conf, Point* points);
 
 #endif //MAIN_CUDA_CUH
