@@ -6,6 +6,12 @@
  */
 
 #include <cstdlib>
+#include <ctime>
+#include <iosfwd>
+#include <iostream>
+#include <fstream>
+#include <numeric>
+#include <vector>
 
 #include "main_CUDA.cuh"
 #include "main_CPU.h"
@@ -16,8 +22,6 @@
 int main(int argc, char** argv)
 {
     simulationConf* conf = new simulationConf;
-    conf->nx = 300;   // Width of the area
-    conf->ny = 300;   // Height of the area
 
     conf->a = 0.5;     // Diffusion constant
 
@@ -29,33 +33,56 @@ int main(int argc, char** argv)
 
     conf->dt = conf->dx2 * conf->dy2 / (2.0 * conf->a * (conf->dx2 + conf->dy2)); // Largest stable time step
     conf->numSteps = 5000;                             // Number of time steps
-    conf->outputEvery = 100;                          // How frequently to write output image
+    conf->outputEvery = 10000;                          // How frequently to write output image
 
-    conf->numElements = conf->nx*conf->ny;
-
-    conf->output_filename_CPU = "/media/storage/git/cc7515_project/output/outputCPU.csv";
-    conf->output_filename_GPU = "/media/storage/git/cc7515_project/output/outputGPU.csv";
+    // conf->output_filename_CPU = "/media/storage/git/cc7515_project/output/outputCPU.csv";
+    // conf->output_filename_GPU = "/media/storage/git/cc7515_project/output/outputGPU.csv";
     conf->Tin = 100.0f;
     conf->Tout = 000.0f;
 
-    // Allocate two sets of data for current and next timesteps
-    float* Un   = (float*)calloc(conf->numElements, sizeof(float));
-    float* Unp1 = (float*)calloc(conf->numElements, sizeof(float));
+    std::ofstream cpuFile("/media/storage/git/cc7515_project/output/benchmarkCPU.csv");
+    std::ofstream gpuFile("/media/storage/git/cc7515_project/output/benchmarkGPU.csv");
 
-    conf->Un = Un; conf->Unp1 = Unp1;
+    if (!(gpuFile.is_open() && cpuFile.is_open())) std::cerr << "Error: Unable to open file for writing.\n";
 
-    Point* points = (Point*)malloc(conf->numElements * sizeof(Point));
+    cpuFile << "engine,size,time\n";
+    gpuFile << "engine,size,time\n";
 
-    initDisk(conf, conf->nx/10.0, points);
-    mainCPU(conf, points);
+    for (int sim = 100 ; sim <= 1000 ; sim += 100) {
+        conf->nx = sim;   // Width of the area
+        conf->ny = sim;   // Height of the area
 
-    initDisk(conf, conf->nx/10.0, points);
-    mainCUDA(conf, points);
+        conf->numElements = conf->nx*conf->ny;
 
-    // Release the memory
-    free(Un);
-    free(Unp1);
-    free(points);
+        // Allocate two sets of data for current and next timesteps
+        float* Un   = (float*)calloc(conf->numElements, sizeof(float));
+        float* Unp1 = (float*)calloc(conf->numElements, sizeof(float));
 
+        conf->Un = Un; conf->Unp1 = Unp1;
+
+        Point* points = (Point*)malloc(conf->numElements * sizeof(Point));
+
+        initDisk(conf, conf->nx/10.0, points);
+        clock_t start = clock();
+        mainCPU(conf, points);
+        clock_t finish = clock();
+        char cpu_obuf[64];
+        sprintf(cpu_obuf, "CPU,%d,%f\n", sim, (double)(finish - start) / CLOCKS_PER_SEC);
+        cpuFile << cpu_obuf;
+
+        initDisk(conf, conf->nx/10.0, points);
+        char gpu_obuf[64];
+        start = clock();
+        mainCUDA(conf, points);
+        finish = clock();
+        sprintf(gpu_obuf, "GPU,%d,%f\n", sim, (double)(finish - start) / CLOCKS_PER_SEC);
+        gpuFile << gpu_obuf;
+
+        // Release the memory
+        free(Un);
+        free(Unp1);
+        free(points);
+    }
+    free(conf);
     return 0;
 }
