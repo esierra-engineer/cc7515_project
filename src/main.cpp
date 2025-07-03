@@ -33,10 +33,10 @@ int main(int argc, char** argv)
 
     conf->dt = conf->dx2 * conf->dy2 / (2.0 * conf->a * (conf->dx2 + conf->dy2)); // Largest stable time step
     conf->numSteps = 5000;                             // Number of time steps
-    conf->outputEvery = 10000;                          // How frequently to write output image
+    conf->outputEvery = 100;                          // How frequently to write output image
 
-    // conf->output_filename_CPU = "/media/storage/git/cc7515_project/output/outputCPU.csv";
-    // conf->output_filename_GPU = "/media/storage/git/cc7515_project/output/outputGPU.csv";
+    conf->output_filename_CPU = "/media/storage/git/cc7515_project/output/outputCPU.csv";
+    conf->output_filename_GPU = "/media/storage/git/cc7515_project/output/outputGPU.csv";
     conf->Tin = 100.0f;
     conf->Tout = 000.0f;
 
@@ -48,7 +48,7 @@ int main(int argc, char** argv)
     cpuFile << "engine,size,time\n";
     gpuFile << "engine,size,time\n";
 
-    for (int sim = 100 ; sim <= 1000 ; sim += 100) {
+    for (int sim = 300 ; sim <= 300 ; sim += 100) {
         conf->nx = sim;   // Width of the area
         conf->ny = sim;   // Height of the area
 
@@ -63,18 +63,22 @@ int main(int argc, char** argv)
         Point* points = (Point*)malloc(conf->numElements * sizeof(Point));
 
         initDisk(conf, conf->nx/10.0, points);
+
         clock_t start = clock();
         mainCPU(conf, points);
         clock_t finish = clock();
+
         char cpu_obuf[64];
         sprintf(cpu_obuf, "CPU,%d,%f\n", sim, (double)(finish - start) / CLOCKS_PER_SEC);
         cpuFile << cpu_obuf;
 
         initDisk(conf, conf->nx/10.0, points);
-        char gpu_obuf[64];
+
         start = clock();
         mainCUDA(conf, points);
         finish = clock();
+
+        char gpu_obuf[64];
         sprintf(gpu_obuf, "GPU,%d,%f\n", sim, (double)(finish - start) / CLOCKS_PER_SEC);
         gpuFile << gpu_obuf;
 
