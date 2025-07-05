@@ -91,8 +91,8 @@ The simulation parameters can be modified in `src/main.cpp`:
 - `dx`, `dy`: Grid spacing (default: 0.01)
 - `numSteps`: Number of time steps (default: 5000)
 - `outputEvery`: Output frequency (default: 100)
-- `Tin`: Initial temperature of hot disk (default: 100.0°F)
-- `Tout`: Background temperature (default: 0.0°F)
+- `Tin`: Initial temperature of hot disk (default: 100.0°C)
+- `Tout`: Background temperature (default: 0.0°C)
 - `nx`, `ny`: Grid dimensions (configurable in loop)
 
 ### Output Files
