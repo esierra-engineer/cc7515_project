@@ -17,7 +17,14 @@ set(SOURCES
         src/main_CPU.cpp
         src/main.cpp
         src/Point.cpp
+        src/glad.c
 )
+
+find_package(glfw3 3.3 REQUIRED)
+find_package(OpenGL REQUIRED)
 
 add_executable(cc7515_project
         ${SOURCES})
+
+target_link_libraries(cc7515_project OpenGL::GL glfw)
+target_include_directories(cc7515_project PRIVATE include)

@@ -1,92 +1,138 @@
-/*
- * Based on CSC materials from:
- *
- * https://github.com/csc-training/openacc/tree/master/exercises/heat
- *
- */
+#include <glad/gl.h>
+#define GLFW_INCLUDE_NONE
+#include <GLFW/glfw3.h>
+
+#include "linmath.h"
 
 #include <cstdlib>
-#include <ctime>
-#include <iosfwd>
-#include <iostream>
-#include <fstream>
-#include <numeric>
-#include <vector>
+#include <cstdio>
 
-#include "main_CUDA.cuh"
-#include "main_CPU.h"
-#include "Point.h"
-// #include "pngwriter.h"
-
-
-int main(int argc, char** argv)
+static const struct
 {
-    simulationConf* conf = new simulationConf;
+    float x, y;
+    float r, g, b;
+} vertices[3] =
+{
+    { -0.6f, -0.4f, 1.f, 0.f, 0.f },
+    {  0.6f, -0.4f, 0.f, 1.f, 0.f },
+    {   0.f,  0.6f, 0.f, 0.f, 1.f }
+};
 
-    conf->a = 0.5;     // Diffusion constant
+static const char* vertex_shader_text =
+"#version 110\n"
+"uniform mat4 MVP;\n"
+"attribute vec3 vCol;\n"
+"attribute vec2 vPos;\n"
+"varying vec3 color;\n"
+"void main()\n"
+"{\n"
+"    gl_Position = MVP * vec4(vPos, 0.0, 1.0);\n"
+"    color = vCol;\n"
+"}\n";
 
-    const float dx = 0.01;   // Horizontal grid spacing
-    const float dy = 0.01;   // Vertical grid spacing
+static const char* fragment_shader_text =
+"#version 110\n"
+"varying vec3 color;\n"
+"void main()\n"
+"{\n"
+"    gl_FragColor = vec4(color, 1.0);\n"
+"}\n";
 
-    conf->dx2 = dx*dx;
-    conf->dy2 = dy*dy;
+static void error_callback(int error, const char* description)
+{
+    fprintf(stderr, "Error: %s\n", description);
+}
 
-    conf->dt = conf->dx2 * conf->dy2 / (2.0 * conf->a * (conf->dx2 + conf->dy2)); // Largest stable time step
-    conf->numSteps = 5000;                             // Number of time steps
-    conf->outputEvery = 100;                          // How frequently to write output image
+static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, GLFW_TRUE);
+}
 
-    conf->output_filename_CPU = "/media/storage/git/cc7515_project/output/outputCPU.csv";
-    conf->output_filename_GPU = "/media/storage/git/cc7515_project/output/outputGPU.csv";
-    conf->Tin = 100.0f;
-    conf->Tout = 000.0f;
+int main(void)
+{
+    GLFWwindow* window;
+    GLuint vertex_buffer, vertex_shader, fragment_shader, program;
+    GLint mvp_location, vpos_location, vcol_location;
 
-    std::ofstream cpuFile("/media/storage/git/cc7515_project/output/benchmarkCPU.csv");
-    std::ofstream gpuFile("/media/storage/git/cc7515_project/output/benchmarkGPU.csv");
+    glfwSetErrorCallback(error_callback);
 
-    if (!(gpuFile.is_open() && cpuFile.is_open())) std::cerr << "Error: Unable to open file for writing.\n";
+    if (!glfwInit())
+        exit(EXIT_FAILURE);
 
-    cpuFile << "engine,size,time\n";
-    gpuFile << "engine,size,time\n";
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
 
-    for (int sim = 300 ; sim <= 300 ; sim += 100) {
-        conf->nx = sim;   // Width of the area
-        conf->ny = sim;   // Height of the area
-
-        conf->numElements = conf->nx*conf->ny;
-
-        // Allocate two sets of data for current and next timesteps
-        float* Un   = (float*)calloc(conf->numElements, sizeof(float));
-        float* Unp1 = (float*)calloc(conf->numElements, sizeof(float));
-
-        conf->Un = Un; conf->Unp1 = Unp1;
-
-        Point* points = (Point*)malloc(conf->numElements * sizeof(Point));
-
-        initDisk(conf, conf->nx/10.0, points);
-
-        clock_t start = clock();
-        mainCPU(conf, points);
-        clock_t finish = clock();
-
-        char cpu_obuf[64];
-        sprintf(cpu_obuf, "CPU,%d,%f\n", sim, (double)(finish - start) / CLOCKS_PER_SEC);
-        cpuFile << cpu_obuf;
-
-        initDisk(conf, conf->nx/10.0, points);
-
-        start = clock();
-        mainCUDA(conf, points);
-        finish = clock();
-
-        char gpu_obuf[64];
-        sprintf(gpu_obuf, "GPU,%d,%f\n", sim, (double)(finish - start) / CLOCKS_PER_SEC);
-        gpuFile << gpu_obuf;
-
-        // Release the memory
-        free(Un);
-        free(Unp1);
-        free(points);
+    window = glfwCreateWindow(640, 480, "Simple example", NULL, NULL);
+    if (!window)
+    {
+        glfwTerminate();
+        exit(EXIT_FAILURE);
     }
-    free(conf);
-    return 0;
+
+    glfwSetKeyCallback(window, key_callback);
+
+    glfwMakeContextCurrent(window);
+    gladLoadGL(glfwGetProcAddress);
+    glfwSwapInterval(1);
+
+    // NOTE: OpenGL error checks have been omitted for brevity
+
+    glGenBuffers(1, &vertex_buffer);
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+    vertex_shader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertex_shader, 1, &vertex_shader_text, NULL);
+    glCompileShader(vertex_shader);
+
+    fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragment_shader, 1, &fragment_shader_text, NULL);
+    glCompileShader(fragment_shader);
+
+    program = glCreateProgram();
+    glAttachShader(program, vertex_shader);
+    glAttachShader(program, fragment_shader);
+    glLinkProgram(program);
+
+    mvp_location = glGetUniformLocation(program, "MVP");
+    vpos_location = glGetAttribLocation(program, "vPos");
+    vcol_location = glGetAttribLocation(program, "vCol");
+
+    glEnableVertexAttribArray(vpos_location);
+    glVertexAttribPointer(vpos_location, 2, GL_FLOAT, GL_FALSE,
+                          sizeof(vertices[0]), (void*) 0);
+    glEnableVertexAttribArray(vcol_location);
+    glVertexAttribPointer(vcol_location, 3, GL_FLOAT, GL_FALSE,
+                          sizeof(vertices[0]), (void*) (sizeof(float) * 2));
+
+    while (!glfwWindowShouldClose(window))
+    {
+        float ratio;
+        int width, height;
+        mat4x4 m, p, mvp;
+
+        glfwGetFramebufferSize(window, &width, &height);
+        ratio = width / (float) height;
+
+        glViewport(0, 0, width, height);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        mat4x4_identity(m);
+        mat4x4_rotate_Z(m, m, (float) glfwGetTime());
+        mat4x4_ortho(p, -ratio, ratio, -1.f, 1.f, 1.f, -1.f);
+        mat4x4_mul(mvp, p, m);
+
+        glUseProgram(program);
+        glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*) mvp);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
+
+        glfwSwapBuffers(window);
+        glfwPollEvents();
+    }
+
+    glfwDestroyWindow(window);
+
+    glfwTerminate();
+    exit(EXIT_SUCCESS);
 }
