@@ -35,7 +35,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 int main()
 {
 	// number of squares in width (x)
-	int W = 64;
+	int W = 256;
 	// number of squares in height (y)
 	int H = W;
 	// total number of squares
