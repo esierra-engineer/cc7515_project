@@ -6,6 +6,8 @@ A real-time 2D heat transfer simulation with OpenGL visualization, featuring bot
 
 This project implements a real-time 2D heat diffusion simulation that models heat transfer across a grid using the explicit finite difference method. The simulation visualizes a circular hot disk in the center of a cooler domain and displays the temperature evolution in real-time with color-coded visualization. Users can switch between CPU and GPU implementations and adjust parameters through an interactive GUI.
 
+**Video Demo:** [Link](https://youtube.com/shorts/UIFWh9c5I8Y)
+
 ## Features
 
 - **Real-time Visualization**: OpenGL-based rendering with color-coded temperature display
