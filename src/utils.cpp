@@ -27,8 +27,8 @@ void initDisk(Square* squares, int W, int H, float dx, float dy, float Height, f
         for (int j=0; j < H; ++j) {
             int index = getIndex(i, j, W);
 
-            float x = dx * j - Height/2.0f;
-            float y = dy * i - Width/2.0f;
+            float x = dx * j - Width/2.0f;
+            float y = dy * i - Height/2.0f;
 
             if (abs(x)<0.01f && abs(y)<0.01f) {
                 center_coordinates->x = i;

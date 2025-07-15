@@ -35,7 +35,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 int main()
 {
 	// number of squares in width (x)
-	int W = 256;
+	int W = 128;
 	// number of squares in height (y)
 	int H = W;
 	// total number of squares
@@ -66,7 +66,7 @@ int main()
 	// GUI
 	int windowWidth = 900;
 	int windowHeight = 900;
-	float dt_slider_value = 1.0f;
+	float dt_slider_value = .5f;
 
 	vec<2, int> center_coordinates = vec<2, int>(0, 0);
 	initDisk(squares, W, H, dx, dy, Height, Width, radius2, Tin, Tout, &center_coordinates);
@@ -122,10 +122,12 @@ int main()
 
 	// Gets ID of uniform called "scale"
 	GLuint uniID = glGetUniformLocation(shaderProgram.ID, "scale");
+	GLuint scalexyUniID = glGetUniformLocation(shaderProgram.ID, "xy_ratio");
 
 	//
 	mat4 view = mat4(1.0f);
-	mat4 projection = mat4(1.0f);
+	// mat4 projection = mat4(1.0f);
+	mat4 projection = ortho(-1.0f, .0f, -1.0f, .0f);
 
 	// Setup Dear ImGui context
 	IMGUI_CHECKVERSION();
@@ -136,9 +138,16 @@ int main()
 	// Setup Platform/Renderer backends
 	ImGui_ImplGlfw_InitForOpenGL(window, true);          // Second param install_callback=true will install GLFW callbacks and chain to existing ones.
 	ImGui_ImplOpenGL3_Init();
+
+	double previousTime = glfwGetTime();
+	int frameCount = 0;
+	std::string textFPS;
+
 	// Main while loop
 	while (!glfwWindowShouldClose(window))
 	{
+		double currentTime = glfwGetTime();
+		frameCount++;
 		// Specify the color of the background
 		glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
 		// Clean the back buffer and assign the new color to it
@@ -158,13 +167,27 @@ int main()
 		sprintf(displayText, "Center Temperature: %.1f", centerTemp);
 		ImGui::Text(displayText);
 		char displayText2[64];
+		ImGui::Separator();
 		sprintf(displayText2, "Total Elements: %d", N);
 		ImGui::Text(displayText2);
 
 		char displayText3[64];
 		float elapsedTime = glfwGetTime();
 		sprintf(displayText3, "Time Elapsed: %.2f s", elapsedTime);
+		ImGui::Separator();
 		ImGui::Text(displayText3);
+
+		if ( currentTime - previousTime >= 1.0 )
+		{
+			// Display the frame count here any way you want.
+			textFPS = std::to_string(frameCount);
+
+			frameCount = 0;
+			previousTime = currentTime;
+		}
+		ImGui::Separator();
+		ImGui::Text("Framerate: ");
+		ImGui::TextColored(ImVec4(1.0f, 0.0f, 1.0f, 1.0f), (textFPS + " FPS").c_str());
 		ImGui::EndMainMenuBar();
 
 		if (showGUI) {
@@ -174,7 +197,7 @@ int main()
 			ImGui::SameLine();
 			ImGui::RadioButton("GPU", &useCPU, 0);
 
-			ImGui::SliderFloat("Time Step", &dt_slider_value, 0.01f, 1.00f);
+			ImGui::SliderFloat("Speed", &dt_slider_value, 0.0f, 1.0f);
 			ImGui::SliderFloat("Inner Temp", &Tin, 0.0f, 100.0f);
 			ImGui::SliderFloat("Outer Temp", &Tout, 0.0f, 100.0f);
 			ImGui::SliderFloat("Transfer Coeff.", &a, 0.01f, 1.0f);
@@ -194,7 +217,7 @@ int main()
 		// Tell OpenGL which Shader Program we want to use
 		shaderProgram.Activate();
 		// Assigns a value to the uniform; NOTE: Must always be done after activating the Shader Program
-		glUniform1f(uniID, 1.0f/W*0.05f);
+		glUniform1f(uniID, 1.0f);
 		// Bind the VAO so OpenGL knows to use it
 		VAO1.Bind();
 		glUniformMatrix4fv(glGetUniformLocation(shaderProgram.ID, "view"), 1, GL_FALSE, value_ptr(view));
@@ -204,8 +227,8 @@ int main()
 		// Largest stable time step
 		float dt = dx * dx * dy * dy / (2.0 * a * (dx * dx + dy * dy));
 
-		if (start & useCPU) updateTemp_CPU(squares, squares_out, N, W, H, dx*dx, dy*dy, a, dt * dt_slider_value);
-		if (start & !useCPU) updateTemp_GPU(squares, squares_out, N, W, H, dx*dx, dy*dy, a, dt * dt_slider_value);
+		if (start & useCPU) updateTemp_CPU(squares, squares_out, N, W, H, dx*dx, dy*dy, a, dt * dt_slider_value + FLT_MIN);
+		if (start & !useCPU) updateTemp_GPU(squares, squares_out, N, W, H, dx*dx, dy*dy, a, dt * dt_slider_value + FLT_MIN);
 		// Swap the back buffer with the front buffer
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
