@@ -122,7 +122,6 @@ int main()
 
 	// Gets ID of uniform called "scale"
 	GLuint uniID = glGetUniformLocation(shaderProgram.ID, "scale");
-	GLuint scalexyUniID = glGetUniformLocation(shaderProgram.ID, "xy_ratio");
 
 	//
 	mat4 view = mat4(1.0f);
