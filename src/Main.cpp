@@ -206,6 +206,8 @@ int main()
 			if (ImGui::Button("Reset")) {
 				initDisk(squares, W, H, dx, dy, Height, Width, R * R, Tin, Tout, &center_coordinates);
 				glfwSetTime(0);
+				float dt = 0;
+				updateTemp_CPU(squares, squares_out, N, W, H, dx*dx, dy*dy, a, dt * dt_slider_value + FLT_MIN);
 			}
 
 			if (ImGui::Button("Resume/Pause")) {
